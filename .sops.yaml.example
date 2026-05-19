@@ -1,0 +1,15 @@
+# SOPS configuration template.
+# Copy to .sops.yaml and replace <YOUR_AGE_PUBLIC_KEY> with your own age recipient.
+#
+# Generate one with:
+#   age-keygen -o $HOME/.config/sops/age/keys.txt
+#
+# The line starting with "# public key:" in that file is what you paste here.
+#
+# Encrypt: sops --encrypt --in-place ansible/vault/secrets.sops.yml
+# Decrypt: sops --decrypt        ansible/vault/secrets.sops.yml
+# Edit:    sops                  ansible/vault/secrets.sops.yml
+
+creation_rules:
+  - path_regex: ansible/vault/.*\.sops\.yml$
+    age: <YOUR_AGE_PUBLIC_KEY>

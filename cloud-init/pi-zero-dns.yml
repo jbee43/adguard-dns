@@ -1,0 +1,54 @@
+#cloud-config
+# Cloud-init for Pi Zero 2 W - AdGuard Home + Unbound DNS node
+# OS: Raspberry Pi OS Lite (Bookworm, 64-bit)
+#
+# Tokens like __HOSTNAME__, __SSH_PUBLIC_KEY__, __ADMIN_USER__ and __TIMEZONE__
+# are substituted at flash time by scripts/flash-image.ps1 / flash-sd.sh.
+#
+# Pi Zeros use DHCP on the LAN; pin the IP via a DHCP reservation on the router.
+# AdGuard Home + Unbound themselves are installed by Ansible, not here.
+
+hostname: __HOSTNAME__
+
+locale: en_US.UTF-8
+timezone: __TIMEZONE__
+
+# --- Users ---
+users:
+  - name: __ADMIN_USER__
+    groups: sudo
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: true
+    ssh_authorized_keys:
+      - __SSH_PUBLIC_KEY__
+
+# --- SSH Hardening ---
+ssh_pwauth: false
+disable_root: true
+
+# --- Packages ---
+# Keep minimal - Pi Zero 2 W has only 512MB RAM
+package_update: true
+package_upgrade: true
+packages:
+  - curl
+  - dnsutils
+  - jq
+  - unbound
+
+# --- Run commands ---
+runcmd:
+  # Disable unnecessary services to save RAM
+  - systemctl disable --now bluetooth.service || true
+  - systemctl disable --now avahi-daemon.service || true
+  - systemctl disable --now triggerhappy.service || true
+  # Disable swap to keep things predictable; Ansible adds zram later.
+  - dphys-swapfile swapoff || true
+  - dphys-swapfile uninstall || true
+  - systemctl disable dphys-swapfile.service || true
+
+power_state:
+  mode: reboot
+  message: "Cloud-init complete. Rebooting..."
+  timeout: 30

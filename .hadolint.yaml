@@ -1,0 +1,3 @@
+---
+ignored:
+  - DL3008  # apt pin versions - impractical for devcontainer

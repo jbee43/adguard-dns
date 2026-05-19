@@ -1,0 +1,96 @@
+---
+# renovate: datasource=github-releases depName=AdguardTeam/AdGuardHome
+adguard_version: v0.107.74
+adguard_install_dir: /opt/AdGuardHome
+adguard_port: 8089
+adguard_dns_port: 53
+
+adguard_admin_user: "{{ admin_user }}"
+adguard_admin_password_hash: "{{ vault_adguard_admin_password_hash }}"
+
+adguard_upstream_dns:
+  - 127.0.0.1:5335
+adguard_bootstrap_dns:
+  - 127.0.0.1:5335
+
+adguard_cache_size: 4194304
+# Query log lives on disk; Pi Zero SD endurance + RAM headroom both push for tight
+# retention. 24h is the docs-stated value and enough for same-day debugging.
+adguard_querylog_interval: 24h
+adguard_querylog_ignored: []
+#  - wpad.lan
+# Statistics are low-volume aggregates - SD impact is negligible even at 30 days.
+adguard_statistics_interval: 720h
+adguard_statistics_ignored: []
+#  - wpad.lan
+adguard_theme: dark
+
+# DNS rewrites - map local hostnames to IPs (like Pi-hole's "Local DNS Records").
+# Wildcards supported: "*.lab.example" → 192.0.2.10.
+# Each entry defaults to enabled; set `enabled: false` to disable a single rule
+# without removing it from the inventory.
+# Populate per-environment via group_vars (e.g. inventory/group_vars/dns_servers.yml).
+# Example:
+#   adguard_rewrites:
+#     - { domain: router.home.arpa, answer: 192.0.2.1 }
+#     - { domain: "*.lab.example",  answer: 192.0.2.10 }
+#     - { domain: legacy.home.arpa, answer: 192.0.2.99, enabled: false }
+adguard_rewrites: []
+
+# Persistent clients - identified by IP (not MAC, which breaks across VLANs)
+# Example:
+#   adguard_clients:
+#     - name: Desktop
+#       ids:
+#         - 192.0.2.50
+#       tags:
+#         - user_regular
+#     - name: Console
+#       ids:
+#         - 192.0.2.51
+#       tags:
+#         - user_regular
+#       use_global_settings: false
+#       parental_enabled: true
+#     - name: Smart TV
+#       ids:
+#         - 192.0.2.52
+#       tags:
+#         - user_regular
+#       blocked_services:
+#         - facebook
+#         - tiktok
+#     - name: IoT subnet
+#       ids:
+#         - 192.0.2.0/24
+#       tags:
+#         - device_other
+#       use_global_settings: false
+#       safebrowsing_enabled: true
+adguard_clients: []
+
+adguard_filters:
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt
+    name: AdGuard DNS filter
+    id: 1
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_2.txt
+    name: AdAway Default Blocklist
+    id: 2
+  - enabled: true
+    url: https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/pro.txt
+    name: Hagezi Multi PRO
+    id: 3
+  - enabled: true
+    url: https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=1&mimetype=plaintext
+    name: Peter Lowe's Ad and tracking server list
+    id: 4
+  - enabled: true
+    url: https://small.oisd.nl/
+    name: OISD Small
+    id: 5
+  - enabled: true
+    url: https://malware-filter.gitlab.io/malware-filter/phishing-filter-ag.txt
+    name: Phishing URL Blocklist
+    id: 6

@@ -1,0 +1,24 @@
+---
+- name: Restart systemd-timesyncd
+  ansible.builtin.systemd:
+    name: systemd-timesyncd
+    state: restarted
+
+- name: Restart zramswap
+  ansible.builtin.systemd:
+    name: zramswap
+    state: restarted
+
+- name: Restart systemd-journald
+  ansible.builtin.systemd:
+    name: systemd-journald
+    state: restarted
+
+- name: Reload systemd and restart apt timers
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name: "{{ item }}"
+    state: restarted
+  loop:
+    - apt-daily.timer
+    - apt-daily-upgrade.timer

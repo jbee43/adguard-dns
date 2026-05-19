@@ -1,0 +1,80 @@
+---
+# Fast local hooks mirroring CI (lint.yml) - slow scans stay CI-only.
+# Auto-formatters run before linters so the linters check the formatted
+# output and CI fails on uncommitted formatting drift.
+repos:
+  # --- Auto-formatters ---
+
+  - repo: https://github.com/rbubley/mirrors-prettier
+    rev: v3.8.3
+    hooks:
+      - id: prettier
+        # Scoped to Markdown + JSON. YAML stays with yamllint (different
+        # opinions on quoting, line length); shell stays with shellcheck
+        # only (shfmt was rejected: it corrupts associative-array keys
+        # that contain dashes, and reflows case statements verbosely).
+        types_or: [markdown, json]
+
+  # --- Linters ---
+
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
+
+  - repo: https://github.com/ansible/ansible-lint
+    rev: v24.12.2
+    hooks:
+      - id: ansible-lint
+        additional_dependencies:
+          - ansible>=10.0,<12
+
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.48.0
+    hooks:
+      - id: markdownlint
+
+  - repo: https://github.com/editorconfig-checker/editorconfig-checker.python
+    rev: 3.6.1
+    hooks:
+      - id: editorconfig-checker
+        alias: ec
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+        # Default hook scope is ^\.github/workflows/.*$; every workflow in
+        # this repo lives under .gitea/workflows/. Without the widened
+        # regex the hook matches no files and silently passes. Cover both
+        # prefixes so a future .github/workflows/ would also be linted.
+        files: ^\.(github|gitea)/workflows/[^/]+\.ya?ml$
+        # The internal runner accepts a few things upstream actionlint
+        # flags as GitHub-incompatible: the platform-local `gitea` context,
+        # `${{ vars.* }}` inside URL-style `uses:` refs for private-registry
+        # actions, and the intentional `actions/cache@v3` pin (act_runner
+        # only speaks v1 cache protocol, see go-gitea/gitea#33393).
+        # Suppress only those exact messages — every other actionlint
+        # finding still fails.
+        args:
+          - -ignore
+          - 'undefined variable "gitea"'
+          - -ignore
+          - 'context "vars" is not allowed here'
+          - -ignore
+          - 'too old to run on GitHub Actions'
+
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.14.0
+    hooks:
+      - id: hadolint
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks

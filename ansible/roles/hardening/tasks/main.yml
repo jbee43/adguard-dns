@@ -1,0 +1,107 @@
+---
+- name: Harden SSH - disable password authentication
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PasswordAuthentication'
+    line: 'PasswordAuthentication no'
+    validate: 'sshd -t -f %s'
+  notify: Restart sshd
+
+- name: Harden SSH - disable root login
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PermitRootLogin'
+    line: 'PermitRootLogin no'
+    validate: 'sshd -t -f %s'
+  notify: Restart sshd
+
+# Keepalives detect dead clients quickly so sshd doesn't keep half-open sessions
+# eating slots; MaxStartups raises the unauth backlog so a brief memory stall on
+# small hosts (Pi Zero) doesn't lock the operator out for minutes.
+- name: Harden SSH - ClientAliveInterval
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?ClientAliveInterval'
+    line: 'ClientAliveInterval 30'
+    validate: 'sshd -t -f %s'
+  notify: Restart sshd
+
+- name: Harden SSH - ClientAliveCountMax
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?ClientAliveCountMax'
+    line: 'ClientAliveCountMax 3'
+    validate: 'sshd -t -f %s'
+  notify: Restart sshd
+
+- name: Harden SSH - MaxStartups
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?MaxStartups'
+    line: 'MaxStartups 10:30:60'
+    validate: 'sshd -t -f %s'
+  notify: Restart sshd
+
+- name: Install UFW
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+
+- name: UFW - default deny incoming
+  community.general.ufw:
+    direction: incoming
+    policy: deny
+
+- name: UFW - default allow outgoing
+  community.general.ufw:
+    direction: outgoing
+    policy: allow
+
+- name: UFW - allow SSH
+  community.general.ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+
+- name: UFW - enable firewall
+  community.general.ufw:
+    state: enabled
+
+# IGMP is link-scoped multicast (group management). ISP routers running IGMP
+# querier flood "[UFW BLOCK] PROTO=2" lines every ~20 s otherwise - unactionable
+# noise that drowns useful entries. Accepting IGMP is safe (link-local only).
+- name: UFW - allow IGMP in before.rules (silence multicast log noise)
+  ansible.builtin.blockinfile:
+    path: /etc/ufw/before.rules
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - IGMP allow"
+    insertbefore: "^# don't delete the 'COMMIT' line"
+    block: |
+      # Accept IGMP (multicast group management) - silences UFW BLOCK noise
+      -A ufw-before-input -p igmp -j ACCEPT
+  notify: Reload UFW
+
+- name: Set sysctl - net.ipv4.ip_forward
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    sysctl_set: true
+    reload: true
+  when: "'k3s_servers' in group_names"
+
+- name: Set sysctl - bridge-nf-call-iptables
+  ansible.posix.sysctl:
+    name: net.bridge.bridge-nf-call-iptables
+    value: "1"
+    sysctl_set: true
+    reload: true
+  failed_when: false  # br_netfilter may not be loaded yet on first run
+  when: "'k3s_servers' in group_names"
+
+- name: Set sysctl - bridge-nf-call-ip6tables
+  ansible.posix.sysctl:
+    name: net.bridge.bridge-nf-call-ip6tables
+    value: "1"
+    sysctl_set: true
+    reload: true
+  failed_when: false
+  when: "'k3s_servers' in group_names"

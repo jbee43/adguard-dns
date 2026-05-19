@@ -1,0 +1,106 @@
+---
+- name: Install unbound, anchor utility and DNS root data
+  ansible.builtin.apt:
+    name:
+      - unbound
+      - unbound-anchor
+      - dns-root-data
+    state: present
+    update_cache: true
+
+# /var/lib/unbound/root.key is the legacy auto-trust-anchor-file. We switched
+# to a static trust-anchor-file (/usr/share/dns/root.key) on 2026-05-03 after
+# unbound was SIGKILL'd mid-write of the autotrust file, leaving a duplicated
+# anchor that bricked every subsequent start. Remove the stale file so it
+# can't quietly come back into play if the config is ever reverted.
+- name: Remove legacy auto-trust-anchor file
+  ansible.builtin.file:
+    path: /var/lib/unbound/root.key
+    state: absent
+
+- name: Deploy unbound configuration
+  ansible.builtin.template:
+    src: unbound.conf.j2
+    dest: /etc/unbound/unbound.conf.d/pi-recursive.conf
+    owner: root
+    group: root
+    mode: "0644"
+    validate: unbound-checkconf %s
+  notify: Restart unbound
+
+- name: Ensure unbound systemd drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/system/unbound.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy unbound resilience drop-in
+  ansible.builtin.template:
+    src: unbound-resilience.conf.j2
+    dest: /etc/systemd/system/unbound.service.d/resilience.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart unbound
+
+- name: Deploy unbound wait-for-time-sync drop-in
+  ansible.builtin.template:
+    src: unbound-wait-time.conf.j2
+    dest: /etc/systemd/system/unbound.service.d/wait-time.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart unbound
+
+# time-sync.target only fires after timesyncd has actually contacted a server
+# when this wait service is enabled. Critical on WiFi-only Pi Zeros where the
+# clock is unset at boot and only converges minutes later. Detect first because
+# the unit name isn't shipped on every systemd build (e.g. minimal images).
+- name: Detect systemd time-wait-sync unit
+  ansible.builtin.find:
+    paths:
+      - /lib/systemd/system
+      - /usr/lib/systemd/system
+      - /etc/systemd/system
+    patterns: systemd-time-wait-sync.service
+    file_type: any
+  register: time_wait_sync_check
+
+- name: Enable systemd-time-wait-sync.service (DNSSEC needs an accurate clock at boot)
+  ansible.builtin.systemd:
+    name: systemd-time-wait-sync.service
+    enabled: true
+  when: time_wait_sync_check.matched > 0
+
+- name: Warn if systemd-time-wait-sync.service is unavailable
+  ansible.builtin.debug:
+    msg: >-
+      systemd-time-wait-sync.service not found on this host
+      ({{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }}).
+      Boot-time DNSSEC validation may fail until timesyncd converges. Investigate
+      if unbound shows DNSSEC errors immediately after a cold boot.
+  when: time_wait_sync_check.matched == 0
+
+- name: Ensure unbound is running
+  ansible.builtin.systemd:
+    name: unbound
+    enabled: true
+    state: started
+
+- name: Apply pending config changes before verification
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify unbound is resolving
+  ansible.builtin.command:
+    cmd: "dig @{{ unbound_interface }} -p {{ unbound_port }} cloudflare.com A +short +time=5 +tries=2"
+  register: unbound_verify
+  changed_when: false
+  retries: 3
+  delay: 5
+  until: unbound_verify.rc == 0

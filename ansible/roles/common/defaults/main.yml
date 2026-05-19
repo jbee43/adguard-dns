@@ -1,0 +1,12 @@
+---
+common_packages:
+  - curl
+  - dnsutils
+  - htop
+  - jq
+  - python3-apt
+  - unattended-upgrades
+
+common_timezone: "{{ timezone }}"
+
+common_ntp_servers: "{{ ntp_servers }}"

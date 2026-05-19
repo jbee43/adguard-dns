@@ -1,0 +1,30 @@
+---
+extends: default
+
+ignore:
+  - ansible/vault/
+
+rules:
+  line-length:
+    # 200 accommodates long `uses:` action references that interpolate
+    # `${{ ... }}` variables — the embedded whitespace inside the
+    # expansion defeats `allow-non-breakable-inline-mappings`, so those
+    # URLs trip the default 80-char limit.
+    max: 200
+    allow-non-breakable-inline-mappings: true
+  indentation:
+    spaces: 2
+    indent-sequences: true
+  truthy:
+    check-keys: false
+    allowed-values: ['true', 'false']
+  comments:
+    min-spaces-from-content: 1
+    require-starting-space: false
+  braces:
+    max-spaces-inside: 1
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: true
+  document-start: disable
+  comments-indentation: disable

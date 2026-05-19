@@ -1,0 +1,56 @@
+server:
+    verbosity: 0
+
+    interface: {{ unbound_interface }}
+    port: {{ unbound_port }}
+
+    do-ip4: yes
+    do-ip6: no
+    do-udp: yes
+    do-tcp: yes
+
+    # Security hardening
+    harden-glue: yes
+    harden-dnssec-stripped: yes
+    harden-referral-path: yes
+    harden-algo-downgrade: yes
+    harden-below-nxdomain: yes
+    use-caps-for-id: yes
+    hide-identity: yes
+    hide-version: yes
+
+    # DNSSEC validation - static anchor from the dns-root-data package.
+    # Read-only; cannot be corrupted by a SIGKILL during an autotrust write
+    # (e.g. OOM mid-write of /var/lib/unbound/root.key). Debian ships KSK
+    # rolls via dns-root-data; trade-off is no in-process RFC 5011 rollover.
+    trust-anchor-file: "/usr/share/dns/root.key"
+
+    # Privacy
+    qname-minimisation: yes
+    aggressive-nsec: yes
+
+    # Performance (optimized for 512 MB RAM)
+    num-threads: {{ unbound_num_threads }}
+    msg-cache-size: {{ unbound_msg_cache_size }}
+    rrset-cache-size: {{ unbound_rrset_cache_size }}
+    cache-min-ttl: {{ unbound_cache_min_ttl }}
+    cache-max-ttl: {{ unbound_cache_max_ttl }}
+    prefetch: yes
+    prefetch-key: yes
+    serve-expired: yes
+    serve-expired-ttl: 86400
+
+    # Access control (loopback only)
+    access-control: 127.0.0.0/8 allow
+    access-control: 0.0.0.0/0 refuse
+
+    # DNS rebinding protection
+    private-address: 10.0.0.0/8
+    private-address: 172.16.0.0/12
+    private-address: 192.168.0.0/16
+    private-address: 169.254.0.0/16
+    private-address: fd00::/8
+    private-address: fe80::/10
+
+    # Root hints
+    root-hints: "/usr/share/dns/root.hints"

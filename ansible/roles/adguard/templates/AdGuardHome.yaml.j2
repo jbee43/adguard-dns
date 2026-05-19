@@ -1,0 +1,212 @@
+theme: {{ adguard_theme }}
+
+http:
+  pprof:
+    port: 6060
+    enabled: false
+  address: 0.0.0.0:{{ adguard_port }}
+  session_ttl: 720h
+
+users:
+  - name: "{{ adguard_admin_user }}"
+    password: "{{ adguard_admin_password_hash }}"
+
+auth_attempts: 5
+block_auth_min: 15
+
+dns:
+  bind_hosts:
+    - 0.0.0.0
+  port: {{ adguard_dns_port }}
+
+  upstream_dns: {{ adguard_upstream_dns | to_json }}
+  bootstrap_dns: {{ adguard_bootstrap_dns | to_json }}
+
+  upstream_dns_file: ""
+  fallback_dns: []
+
+  protection_enabled: true
+  filtering_enabled: true
+  blocking_mode: default
+  blocking_ipv4: ""
+  blocking_ipv6: ""
+  blocked_response_ttl: 10
+
+  enable_dnssec: false
+  edns_client_subnet:
+    custom_ip: ""
+    enabled: false
+    use_custom: false
+
+  cache_size: {{ adguard_cache_size }}
+  cache_ttl_min: 0
+  cache_ttl_max: 0
+  cache_optimistic: true
+
+  ratelimit: 0
+  ratelimit_subnet_len_ipv4: 24
+  ratelimit_subnet_len_ipv6: 56
+  ratelimit_whitelist: []
+  refuse_any: true
+
+  all_servers: false
+  fastest_addr: false
+  fastest_timeout: 1s
+  upstream_timeout: 10s
+  upstream_mode: load_balance
+
+  allowed_clients: []
+  disallowed_clients: []
+  blocked_hosts:
+    - version.bind
+    - id.server
+    - hostname.bind
+  trusted_proxies:
+    - 127.0.0.0/8
+    - ::1/128
+
+  private_networks: []
+  use_private_ptr_resolvers: true
+  local_ptr_upstreams: []
+
+  use_dns64: false
+  dns64_prefixes: []
+
+  serve_http3: false
+  use_http3_upstreams: false
+  serve_plain_dns: true
+
+  hostsfile_enabled: true
+  pending_requests:
+    enabled: true
+  bogus_nxdomain: []
+  aaaa_disabled: false
+
+querylog:
+  dir_path: ""
+  ignored: {{ adguard_querylog_ignored | to_json }}
+  interval: {{ adguard_querylog_interval }}
+  size_memory: 1000
+  enabled: true
+
+statistics:
+  dir_path: ""
+  ignored: {{ adguard_statistics_ignored | to_json }}
+  interval: {{ adguard_statistics_interval }}
+  enabled: true
+
+filters:
+{% if adguard_filters %}
+{% for filter in adguard_filters %}
+  - enabled: {{ filter.enabled | lower }}
+    url: {{ filter.url }}
+    name: {{ filter.name }}
+    id: {{ filter.id }}
+{% endfor %}
+{% else %}
+  []
+{% endif %}
+
+whitelist_filters: []
+
+user_rules: []
+
+filtering:
+  rewrites:
+{% if adguard_rewrites %}
+{% for rw in adguard_rewrites %}
+    - enabled: {{ rw.enabled | default(true) | lower }}
+      domain: "{{ rw.domain }}"
+      answer: "{{ rw.answer }}"
+{% endfor %}
+{% else %}
+    []
+{% endif %}
+  safe_fs_patterns: []
+  safe_search:
+    enabled: false
+    bing: true
+    duckduckgo: true
+    ecosia: true
+    google: true
+    pixabay: true
+    yandex: true
+    youtube: true
+  blocked_services:
+    schedule:
+      time_zone: "{{ timezone }}"
+    ids: []
+  protection_disabled_until: null
+  safe_browsing_enabled: false
+  safe_browsing_block_host: standard-block.dns.adguard.com
+  parental_enabled: false
+  parental_block_host: family-block.dns.adguard.com
+  rewrites_file: ""
+  blocked_services_file: ""
+
+clients:
+{% if adguard_clients %}
+  persistent:
+{% for client in adguard_clients %}
+    - name: "{{ client.name }}"
+      ids: {{ client.ids | to_json }}
+      tags: {{ client.tags | default([]) | to_json }}
+      blocked_services:
+        schedule:
+          time_zone: "{{ timezone }}"
+        ids: {{ client.blocked_services | default([]) | to_json }}
+      upstreams: []
+      use_global_settings: {{ client.use_global_settings | default(true) | lower }}
+      use_global_blocked_services: {{ client.use_global_blocked_services | default(true) | lower }}
+      filtering_enabled: {{ client.filtering_enabled | default(true) | lower }}
+      parental_enabled: {{ client.parental_enabled | default(false) | lower }}
+      safebrowsing_enabled: {{ client.safebrowsing_enabled | default(false) | lower }}
+      safe_search:
+        enabled: {{ client.safe_search | default(false) | lower }}
+{% endfor %}
+{% else %}
+  persistent: []
+{% endif %}
+  runtime_sources:
+    whois: true
+    arp: true
+    rdns: true
+    dhcp: true
+    hosts: true
+
+dhcp:
+  enabled: false
+  interface_name: ""
+  local_domain_name: lan
+
+tls:
+  enabled: false
+  server_name: ""
+  force_https: false
+  port_https: 443
+  port_dns_over_tls: 853
+  port_dns_over_quic: 853
+  port_dnscrypt: 0
+  dnscrypt_config_file: ""
+  allow_unencrypted_doh: false
+  certificate_chain: ""
+  private_key: ""
+  certificate_path: ""
+  private_key_path: ""
+  strict_sni_check: false
+
+log:
+  file: ""
+  max_backups: 0
+  max_size: 10
+  max_age: 3
+  compress: false
+  local_time: false
+  verbose: false
+
+os:
+  group: ""
+  user: ""
+  rlimit_nofile: 0
+
+schema_version: 34

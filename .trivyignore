@@ -1,0 +1,15 @@
+# DS-0002: Specify at least 1 USER command in Dockerfile with non-root user
+#
+# Applies to .devcontainer/Dockerfile. Acceptable for this devcontainer:
+# - it's dev-only — never deployed to a runtime host
+# - the appliance the repo provisions runs Debian/Ubuntu directly via cloud-init
+#   + Ansible, never this image
+# - VS Code Remote Containers maps the host user in, so processes don't run
+#   as container-root from the developer's perspective either
+# - the Microsoft Python devcontainer base image (mcr.microsoft.com/devcontainers/
+#   python) ships as root by design for ergonomic apt-get / pip install during
+#   build; switching to a non-root USER breaks the standard devcontainer flow
+#
+# Revisit if the image gains a production role or the base image starts shipping
+# a default non-root user that the devcontainer features actually support.
+DS-0002

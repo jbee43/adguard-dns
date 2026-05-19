@@ -1,0 +1,11 @@
+# URLs to skip during lychee link-checking.
+# Add entries here only after confirming they're reachable from a normal
+# browser - this file suppresses false positives, not real broken links.
+# Format: one regex per line (matches anywhere in the URL).
+
+# DNS blocklist sources - large files / slow hosts that time out under HEAD/GET
+^https://raw\.githubusercontent\.com/hagezi/dns-blocklists/
+^https://small\.oisd\.nl/?$
+
+# Doc sites occasionally rate-limited from CI runners
+^https://kubernetes\.io/docs/

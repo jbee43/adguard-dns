@@ -1,0 +1,14 @@
+---
+profile: production
+
+exclude_paths:
+  - .git/
+  - .gitea/
+
+enable_list:
+  - fqcn
+
+skip_list:
+  - galaxy
+
+use_default_rules: true

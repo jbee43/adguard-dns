@@ -1,0 +1,89 @@
+---
+# AdGuard Home + Unbound DNS provisioning
+# Usage: make dns
+
+- name: Provision DNS (AdGuard Home + Unbound)
+  hosts: dns_servers
+  vars:
+    _vault_file: "{{ playbook_dir }}/../vault/secrets.sops.yml"
+  pre_tasks:
+    # Catch the common mistake of skipping Phase 0.5 in provisioning.md and
+    # turn an opaque SOPS error into a clear "do this" message.
+    - name: "Pre-flight: locate SOPS vault file"
+      ansible.builtin.stat:
+        path: "{{ _vault_file }}"
+      register: _vault_stat
+      delegate_to: localhost
+      run_once: true
+
+    - name: "Pre-flight: assert SOPS vault file exists"
+      ansible.builtin.assert:
+        that: _vault_stat.stat.exists
+        fail_msg: |
+          SOPS vault not found at ansible/vault/secrets.sops.yml.
+          Copy ansible/vault/secrets.sops.yml.example to that path, fill in
+          the AdGuard admin bcrypt hash, and encrypt with `sops --encrypt
+          --in-place ansible/vault/secrets.sops.yml`. See docs/provisioning.md
+          Phase 0 for the full workflow.
+      delegate_to: localhost
+      run_once: true
+
+    - name: Load encrypted secrets
+      community.sops.load_vars:
+        file: "{{ _vault_file }}"
+      no_log: true
+  roles:
+    - common
+    - hardening
+    - unbound
+    - adguard
+    - role: zabbix_agent
+      when: enable_zabbix_agent | default(false) | bool
+
+  post_tasks:
+    - name: "Health: gather service facts"
+      ansible.builtin.service_facts:
+
+    - name: "Health: assert services are running"
+      ansible.builtin.assert:
+        that:
+          - (ansible_facts.services[item ~ '.service'].state | default('')) == 'running'
+        fail_msg: "{{ item }} is not running (state={{ ansible_facts.services[item ~ '.service'].state | default('absent') }})"
+        success_msg: "{{ item }} is running"
+      loop:
+        - unbound
+        - AdGuardHome
+
+    - name: "Health: confirm AdGuard Home control API responds"
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ adguard_port }}/control/status"
+        return_content: true
+      register: _adguard_status
+      retries: 6
+      delay: 5
+      until:
+        - _adguard_status.status == 200
+        - (_adguard_status.json.running | default(false)) | bool
+
+    - name: "Health: confirm Unbound resolves a recursive query"  # noqa: command-instead-of-module
+      # +tries=1 +time=2 keeps the failure mode fast and obvious if Unbound
+      # is up but unable to reach the root servers (firewall, no internet).
+      # No Ansible module wraps `dig`; the command call is intentional.
+      ansible.builtin.command: >-
+        dig +short +tries=1 +time=2
+        @{{ unbound_interface }} -p {{ unbound_port }}
+        example.com A
+      register: _unbound_query
+      changed_when: false
+      failed_when:
+        - _unbound_query.rc != 0 or (_unbound_query.stdout | trim) == ""
+
+    - name: "Health: report endpoints"
+      vars:
+        _resolved: "{{ _unbound_query.stdout_lines | first | default('(empty)') }}"
+        _host: "{{ ansible_host | default(inventory_hostname) }}"
+      ansible.builtin.debug:
+        msg:
+          - "AdGuard Home UI: http://{{ _host }}:{{ adguard_port }}"
+          - "DNS server:      {{ _host }}:{{ adguard_dns_port }}"
+          - "Unbound resolver: {{ unbound_interface }}:{{ unbound_port }} (example.com -> {{ _resolved }})"

@@ -1,0 +1,13 @@
+# Managed by Ansible (roles/unbound) - do not edit by hand.
+# systemd drop-in: keep unbound restarting through transient failures instead of
+# latching off after the default 5-fails-in-10s threshold.
+[Service]
+Restart=always
+RestartSec=10s
+# unbound is the bottom of the DNS stack - bias the OOM killer toward AdGuard
+# (default score 0) rather than unbound when the 04:00 filter reload spikes RAM.
+OOMScoreAdjust=-100
+
+[Unit]
+StartLimitIntervalSec=10min
+StartLimitBurst=10

@@ -1,0 +1,8 @@
+# Managed by Ansible (roles/unbound) - do not edit by hand.
+# WiFi-only Pi Zero boots before NTP is synced; without this DNSSEC validation
+# can fail on freshly-signed RRsets at boot. Pair with
+# systemd-timesyncd-wait-sync.service so time-sync.target only activates after
+# timesyncd has actually contacted a server.
+[Unit]
+After=time-sync.target
+Wants=time-sync.target

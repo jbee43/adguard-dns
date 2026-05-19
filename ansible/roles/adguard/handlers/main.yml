@@ -1,0 +1,3 @@
+---
+# AdGuard Home is stopped before config deploy and started after,
+# so no restart handler is needed. Kept empty for role structure.

@@ -1,0 +1,36 @@
+root = true
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+charset = utf-8
+
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# Markdown indentation is contextual (3-space ordered-list continuations,
+# 4-space inside lists, ASCII art inside fenced code blocks). Don't enforce
+# a fixed indent_size or editorconfig-checker will flag valid markdown.
+[*.md]
+trim_trailing_whitespace = false
+
+[Makefile]
+indent_style = tab
+
+[*.{ps1,psm1,psd1}]
+indent_style = space
+indent_size = 4
+
+[*.sh]
+indent_style = space
+indent_size = 2
+
+[*.json]
+indent_style = space
+indent_size = 2
+
+[*.py]
+indent_style = space
+indent_size = 4

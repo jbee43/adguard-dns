@@ -1,0 +1,37 @@
+{
+  "name": "adguard-dns",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "redhat.ansible",
+        "redhat.vscode-yaml",
+        "timonwong.shellcheck",
+        "editorconfig.editorconfig",
+        "signageos.signageos-vscode-sops"
+      ],
+      "settings": {
+        "ansible.python.interpreterPath": "/usr/local/bin/python",
+        "ansible.validation.lint.enabled": true,
+        "ansible.validation.lint.path": "ansible-lint",
+        "files.associations": {
+          "**/ansible/**/*.yml": "ansible",
+          "**/playbooks/**/*.yml": "ansible",
+          "**/roles/**/*.yml": "ansible"
+        }
+      }
+    }
+  },
+  "postCreateCommand": "git config --global --add safe.directory ${containerWorkspaceFolder} && pip install --no-cache-dir -r .devcontainer/requirements.txt && ansible-galaxy collection install -r ansible/requirements.yml && npm install -g markdownlint-cli@0.48.0",
+  "remoteUser": "vscode",
+  "containerEnv": {
+    "ANSIBLE_CONFIG": "${containerWorkspaceFolder}/ansible.cfg"
+  },
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.config/sops/age,target=/home/vscode/.config/sops/age,type=bind,readonly,consistency=cached",
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/vscode/.ssh,type=bind,readonly,consistency=cached"
+  ]
+}

@@ -1,0 +1,128 @@
+---
+- name: Create AdGuard Home directory
+  ansible.builtin.file:
+    path: "{{ adguard_install_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Check if AdGuard Home is already installed
+  ansible.builtin.stat:
+    path: "{{ adguard_install_dir }}/AdGuardHome"
+  register: adguard_binary
+
+- name: Check installed AdGuard Home version
+  ansible.builtin.command:
+    cmd: "{{ adguard_install_dir }}/AdGuardHome --version"
+  register: adguard_installed_version
+  changed_when: false
+  failed_when: false
+  when: adguard_binary.stat.exists
+
+- name: Determine if install or upgrade is needed
+  ansible.builtin.set_fact:
+    adguard_needs_install: >-
+      {{ not adguard_binary.stat.exists
+      or (adguard_installed_version.stdout is defined
+      and adguard_version not in adguard_installed_version.stdout) }}
+
+- name: Stop AdGuard Home for upgrade
+  ansible.builtin.systemd:
+    name: AdGuardHome
+    state: stopped
+  when: adguard_needs_install and adguard_binary.stat.exists
+  failed_when: false
+
+- name: Download AdGuard Home
+  ansible.builtin.get_url:
+    url: "https://github.com/AdguardTeam/AdGuardHome/releases/download/{{ adguard_version }}/AdGuardHome_linux_arm64.tar.gz"
+    dest: /tmp/AdGuardHome.tar.gz
+    mode: "0644"
+  when: adguard_needs_install
+
+- name: Clean install directory before extraction
+  ansible.builtin.file:
+    path: "{{ adguard_install_dir }}"
+    state: absent
+  when: adguard_needs_install
+
+- name: Recreate install directory
+  ansible.builtin.file:
+    path: "{{ adguard_install_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  when: adguard_needs_install
+
+- name: Extract AdGuard Home
+  ansible.builtin.unarchive:
+    src: /tmp/AdGuardHome.tar.gz
+    dest: "{{ adguard_install_dir }}"
+    remote_src: true
+    extra_opts:
+      - --strip-components=2
+  when: adguard_needs_install
+
+- name: Ensure AdGuard Home binary is executable
+  ansible.builtin.file:
+    path: "{{ adguard_install_dir }}/AdGuardHome"
+    mode: "0755"
+  when: adguard_needs_install
+
+- name: Check if AdGuard Home service is installed
+  ansible.builtin.stat:
+    path: /etc/systemd/system/AdGuardHome.service
+  register: adguard_service
+
+- name: Install AdGuard Home as service
+  ansible.builtin.command:
+    cmd: "{{ adguard_install_dir }}/AdGuardHome -s install"
+  when: not adguard_service.stat.exists
+  changed_when: true
+
+- name: Stop AdGuard Home before config deployment
+  ansible.builtin.systemd:
+    name: AdGuardHome
+    state: stopped
+  when: adguard_service.stat.exists
+  failed_when: false
+  changed_when: false
+
+- name: Deploy AdGuard Home configuration
+  ansible.builtin.template:
+    src: AdGuardHome.yaml.j2
+    dest: "{{ adguard_install_dir }}/AdGuardHome.yaml"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: UFW - allow DNS (TCP)
+  community.general.ufw:
+    rule: allow
+    port: "{{ adguard_dns_port }}"
+    proto: tcp
+
+- name: UFW - allow DNS (UDP)
+  community.general.ufw:
+    rule: allow
+    port: "{{ adguard_dns_port }}"
+    proto: udp
+
+- name: UFW - allow AdGuard Home web UI
+  community.general.ufw:
+    rule: allow
+    port: "{{ adguard_port }}"
+    proto: tcp
+
+- name: Ensure AdGuard Home is running
+  ansible.builtin.systemd:
+    name: AdGuardHome
+    enabled: true
+    state: started
+
+- name: Clean up download
+  ansible.builtin.file:
+    path: /tmp/AdGuardHome.tar.gz
+    state: absent

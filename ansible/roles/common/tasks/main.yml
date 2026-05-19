@@ -1,0 +1,192 @@
+---
+- name: Set timezone
+  community.general.timezone:
+    name: "{{ common_timezone }}"
+
+- name: Configure systemd-timesyncd NTP servers
+  ansible.builtin.template:
+    src: timesyncd.conf.j2
+    dest: /etc/systemd/timesyncd.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart systemd-timesyncd
+
+- name: Enable systemd-timesyncd
+  ansible.builtin.systemd:
+    name: systemd-timesyncd
+    enabled: true
+    state: started
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install base packages
+  ansible.builtin.apt:
+    name: "{{ common_packages }}"
+    state: present
+
+- name: Disable swap (k3s requires it; pi_zero uses zram instead, configured below)
+  ansible.builtin.command:
+    cmd: swapoff -a
+  changed_when: false
+  when: "'k3s_servers' in group_names"
+
+- name: Remove swap from fstab
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '\sswap\s'
+    state: absent
+  when: "'k3s_servers' in group_names or 'pi_zero' in group_names"
+
+- name: Disable dphys-swapfile
+  ansible.builtin.systemd:
+    name: dphys-swapfile
+    enabled: false
+    state: stopped
+  failed_when: false
+  when: "'pi_zero' in group_names"
+
+# zram - compressed in-RAM swap. On 512 MB Pi Zero 2 W with disk swap disabled,
+# absorbs transient spikes (AdGuard filter refresh, apt) that would otherwise
+# stall user-space (sshd unresponsive while ICMP still answers). See ADR-003 amendment.
+- name: Install zram-tools (pi_zero)
+  ansible.builtin.apt:
+    name: zram-tools
+    state: present
+  when: "'pi_zero' in group_names"
+
+- name: Configure zramswap (pi_zero)
+  ansible.builtin.copy:
+    dest: /etc/default/zramswap
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible (roles/common)
+      ALGO=zstd
+      PERCENT=50
+      PRIORITY=100
+  when: "'pi_zero' in group_names"
+  notify: Restart zramswap
+
+- name: Enable zramswap (pi_zero)
+  ansible.builtin.systemd:
+    name: zramswap
+    enabled: true
+    state: started
+  when: "'pi_zero' in group_names"
+
+- name: Disable unnecessary services on Pi Zero
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+  loop:
+    - bluetooth.service
+    - avahi-daemon.service
+    - triggerhappy.service
+  failed_when: false
+  when: "'pi_zero' in group_names"
+
+- name: Remove legacy aliases in /etc/profile.d (only loaded by login shells)
+  ansible.builtin.file:
+    path: /etc/profile.d/aliases.sh
+    state: absent
+
+- name: Deploy shell aliases to /etc/bash.bashrc (all interactive bash shells)
+  ansible.builtin.blockinfile:
+    path: /etc/bash.bashrc
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - shell aliases"
+    block: |
+      alias cls='clear'
+
+- name: Enable unattended-upgrades
+  ansible.builtin.systemd:
+    name: unattended-upgrades
+    enabled: true
+    state: started
+
+# Pin apt timers away from AdGuard's 04:00 filter refresh. Default apt-daily
+# fires 06:00 / 18:00 with a 12 h randomized delay, which can land on top of
+# AdGuard's morning reload on memory-tight hosts. Tightening keeps overlap deterministic.
+- name: Ensure apt-daily.timer drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/system/apt-daily.timer.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Pin apt-daily.timer schedule (avoid 04:00 AdGuard window)
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/apt-daily.timer.d/override.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible (roles/common)
+      [Timer]
+      OnCalendar=
+      OnCalendar=*-*-* 05:00
+      RandomizedDelaySec=30m
+      Persistent=true
+  notify: Reload systemd and restart apt timers
+
+- name: Ensure apt-daily-upgrade.timer drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/system/apt-daily-upgrade.timer.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Pin apt-daily-upgrade.timer schedule (avoid 04:00 AdGuard window)
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/apt-daily-upgrade.timer.d/override.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible (roles/common)
+      [Timer]
+      OnCalendar=
+      OnCalendar=*-*-* 06:00
+      RandomizedDelaySec=30m
+      Persistent=true
+  notify: Reload systemd and restart apt timers
+
+# Persistent journald - without /var/log/journal, journals live in tmpfs and
+# vanish on rotation/reboot, losing evidence after every incident.
+- name: Ensure /var/log/journal exists (persistent journald)
+  ansible.builtin.file:
+    path: /var/log/journal
+    state: directory
+    owner: root
+    group: systemd-journal
+    mode: "2755"
+
+- name: Ensure journald drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Configure journald - persistent storage with size caps
+  ansible.builtin.copy:
+    dest: /etc/systemd/journald.conf.d/00-managed.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible (roles/common)
+      [Journal]
+      Storage=persistent
+      SystemMaxUse=200M
+      SystemMaxFileSize=50M
+      SystemKeepFree=500M
+  notify: Restart systemd-journald

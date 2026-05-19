@@ -1,0 +1,9 @@
+---
+unbound_port: 5335
+unbound_interface: 127.0.0.1
+
+unbound_num_threads: 1
+unbound_msg_cache_size: 4m
+unbound_rrset_cache_size: 8m
+unbound_cache_min_ttl: 300
+unbound_cache_max_ttl: 86400

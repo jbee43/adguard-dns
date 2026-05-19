@@ -1,0 +1,24 @@
+---
+# Zabbix agent2 from the official Zabbix apt repo. arm64 packages are published
+# under repo.zabbix.com/zabbix/{major}/stable/<distro>/.../binary-arm64/.
+#
+# Pin the major to whatever your Zabbix server speaks. 7.x is non-LTS; the next
+# LTS is 8.0. If you don't run Zabbix, leave enable_zabbix_agent: false in
+# group_vars/all/vars.yml and the playbook will skip this role.
+zabbix_agent_version: "7.4"
+
+zabbix_agent_repo_base: "https://repo.zabbix.com/zabbix"
+# NB: Zabbix publishes the release deb per Debian/Ubuntu **major** version only
+# (`debian12`, not `debian12.13`). Using `ansible_distribution_version` produces a
+# 404 the moment the host advances to a new point release via unattended-upgrades.
+zabbix_agent_release_deb_url: >-
+  {{ zabbix_agent_repo_base }}/{{ zabbix_agent_version }}/release/{{
+  ansible_distribution | lower }}/pool/main/z/zabbix-release/zabbix-release_latest_{{
+  zabbix_agent_version }}+{{ ansible_distribution | lower }}{{
+  ansible_distribution_major_version }}_all.deb
+
+zabbix_agent_server_address: "{{ zabbix_server }}"
+zabbix_agent_hostname: "{{ inventory_hostname }}"
+zabbix_agent_listen_port: 10050
+zabbix_agent_timeout: 30
+zabbix_agent_log_size: 1

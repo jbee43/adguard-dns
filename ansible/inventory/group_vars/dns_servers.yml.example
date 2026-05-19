@@ -1,0 +1,18 @@
+---
+# Group variables for dns_servers hosts.
+# Copy to dns_servers.yml and edit for your environment.
+#
+# adguard_rewrites:  optional local DNS overrides (split-horizon resolution)
+# adguard_clients:   optional named clients shown in AdGuard Home query log
+#
+# Both lists can be left empty if you only want plain ad-blocking.
+
+adguard_rewrites: []
+  # Examples - uncomment and adapt:
+  # - { domain: router.home.arpa, answer: 192.0.2.1 }
+  # - { domain: nas.example.lan,  answer: 192.0.2.20 }
+
+adguard_clients: []
+  # Examples - uncomment and adapt:
+  # - { name: laptop, ids: [192.0.2.50] }
+  # - { name: phone,  ids: [192.0.2.51, 192.0.2.52] }

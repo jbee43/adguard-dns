@@ -1,0 +1,10 @@
+# Force LF line endings everywhere - matches .editorconfig (end_of_line = lf)
+# Prevents CRLF issues when editing on Windows
+* text=auto eol=lf
+
+# Binary files
+*.png        binary
+*.jpg        binary
+*.gz         binary
+*.xz         binary
+*.raw        binary

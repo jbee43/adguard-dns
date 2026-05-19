@@ -1,0 +1,13 @@
+---
+# Common host variables. Copy this file to vars.yml and edit for your environment.
+
+admin_user: admin
+timezone: Etc/UTC
+
+ntp_servers:
+  - 0.pool.ntp.org
+  - 1.pool.ntp.org
+
+# Optional Zabbix monitoring. Leave enable_zabbix_agent: false to skip the role entirely.
+enable_zabbix_agent: false
+zabbix_server: "{{ vault_zabbix_server | default('') }}"

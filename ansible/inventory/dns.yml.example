@@ -1,0 +1,17 @@
+---
+# Inventory example for the DNS appliance.
+# Copy to dns.yml and edit the hostname, IP, and SSH user/key for your node.
+
+all:
+  vars:
+    ansible_user: admin
+    ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+    ansible_python_interpreter: /usr/bin/python3
+  children:
+    dns_servers:
+      hosts:
+        dns-1:
+          ansible_host: 192.0.2.10  # RFC 5737 documentation address - replace
+    pi_zero:
+      children:
+        dns_servers:
